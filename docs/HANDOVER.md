@@ -3,6 +3,14 @@
 Date: 2026-11-24 (Asia/Karachi)
 Status: Development resumed at the user's request on 2026-11-24. The structural correction is implemented; functional module completion remains outstanding.
 
+## API layer checkpoint
+
+The HTTP API layer is implemented for every existing application service operation. It includes versioned controllers, data-annotation validation, JWT creation and validation, request context, active session/user/register/role validation, role authorization, safe problem-detail exception handling, rate limiting, correlation IDs, OpenAPI JSON, health checking, cancellation propagation, and idempotency-header contracts for business mutations.
+
+API contract tests cover controller/versioning conventions, the anonymous endpoint boundary, idempotency headers, and required JWT claims. `dotnet test UnifiedPOS.slnx --no-restore --verbosity minimal` passed all seven tests on 2026-11-24. `git diff --check` passed. The existing `System.Security.Cryptography.Pkcs` NU1902/NU1903 advisories remain and are not resolved by the API work.
+
+This checkpoint does not create or migrate the database, provision the first organization/owner, implement disabled integrations/offline replay, or validate workflows against SQL Server. Those are operational, persistence, or business-policy gaps rather than missing HTTP endpoints.
+
 ## Resumed development checkpoint
 
 The current reference project is `D:\Aun\igi-health-connect-portal`. Its entity, DTO, role service/repository, unit-of-work, and registration conventions were inspected again. The reference project was only read.

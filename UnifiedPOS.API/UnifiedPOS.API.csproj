@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <UserSecretsId>UnifiedPOS-API-Development</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../UnifiedPOS.Application/UnifiedPOS.Application.csproj" />

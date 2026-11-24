@@ -18,6 +18,14 @@ namespace UnifiedPOS.Infrastructure.Databases
                 foreach (var property in type.GetProperties().Where(p => p.PropertyType == typeof(decimal) || p.PropertyType == typeof(decimal?)))
                     entity.Property(property.Name).HasPrecision(19, 4);
             }
+            modelBuilder.Entity<Category>().Property(x => x.Name).HasMaxLength(100);
+            modelBuilder.Entity<Customer>().Property(x => x.Phone).HasMaxLength(20);
+            modelBuilder.Entity<Location>().Property(x => x.Name).HasMaxLength(100);
+            modelBuilder.Entity<Register>().Property(x => x.Name).HasMaxLength(100);
+            modelBuilder.Entity<User>().Property(x => x.UserName).HasMaxLength(100);
+            modelBuilder.Entity<User>().Property(x => x.NormalizedUserName).HasMaxLength(100);
+            modelBuilder.Entity<OutboxMessage>().Property(x => x.Type).HasMaxLength(180);
+            modelBuilder.Entity<Sale>().Property(x => x.ReceiptNumber).HasMaxLength(100);
             modelBuilder.Entity<Location>().HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
             modelBuilder.Entity<Location>().HasIndex(x => new { x.OrganizationId, x.Name }).IsUnique();
             modelBuilder.Entity<Register>().HasOne<Location>().WithMany().HasForeignKey(x => x.LocationId);
