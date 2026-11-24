@@ -65,6 +65,10 @@ app.UseAuthentication();
 app.UseMiddleware<SessionValidationMiddleware>();
 app.UseAuthorization();
 app.MapOpenApi("/openapi/{documentName}.json");
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "Unified POS API v1"));
+}
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" })).AllowAnonymous();
 app.Run();
