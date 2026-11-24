@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="UnifiedPOS.API/UnifiedPOS.API.csproj" />
+  <Project Path="UnifiedPOS.Application/UnifiedPOS.Application.csproj" />
+  <Project Path="UnifiedPOS.Domain/UnifiedPOS.Domain.csproj" />
+  <Project Path="UnifiedPOS.Infrastructure/UnifiedPOS.Infrastructure.csproj" />
+  <Project Path="UnifiedPOS.BackgroundServices/UnifiedPOS.BackgroundServices.csproj" />
+</Solution>
