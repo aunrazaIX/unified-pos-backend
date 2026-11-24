@@ -24,7 +24,7 @@ namespace UnifiedPOS.Application.Services
             var result = await uow.ExecuteAsync(async () =>
             {
                 var normalized = name.Trim().ToUpperInvariant();
-                var user = await uow.Users.FindAsync(x => x.OrganizationId == orgId && x.NormalizedUserName == normalized, ct);
+                var user = await uow.UserRepository.FindUserAsync(x => x.OrganizationId == orgId && x.NormalizedUserName == normalized, ct);
                 var hash = registerId.HasValue ? user?.PinHash : user?.PasswordHash;
                 var valid = hasher.VerifyHashedPassword(user ?? DummyUser, hash ?? DummyHash, secret) != PasswordVerificationResult.Failed;
                 if (user == null || !user.IsActive || user.LockedUntil > DateTime.UtcNow) return null;
@@ -32,13 +32,13 @@ namespace UnifiedPOS.Application.Services
                 {
                     user.FailedAttempts++;
                     if (user.FailedAttempts >= 5) { user.LockedUntil = DateTime.UtcNow.AddMinutes(15); user.FailedAttempts = 0; }
-                    uow.Audits.Add(new AuditEvent { OrganizationId = orgId, ActorId = user.Id, EntityId = user.Id, Action = "Auth.Rejected" });
+                    uow.AuditRepository.AddAuditEvent(new AuditEvent { OrganizationId = orgId, ActorId = user.Id, EntityId = user.Id, Action = "Auth.Rejected" });
                     return null;
                 }
                 if (registerId.HasValue)
                 {
-                    var register = await uow.Registers.FindAsync(x => x.Id == registerId.Value && x.IsActive, ct);
-                    var location = register == null ? null : await uow.Locations.FindAsync(x => x.Id == register.LocationId && x.OrganizationId == orgId && x.IsActive, ct);
+                    var register = await uow.OrganizationRepository.FindRegisterAsync(x => x.Id == registerId.Value && x.IsActive, ct);
+                    var location = register == null ? null : await uow.OrganizationRepository.FindLocationAsync(x => x.Id == register.LocationId && x.OrganizationId == orgId && x.IsActive, ct);
                     if (location == null || !user.Locations.Any(x => x.LocationId == location.Id)) return null;
                 }
                 else if (user.Role == UserRole.Cashier) return null;
@@ -46,8 +46,8 @@ namespace UnifiedPOS.Application.Services
                 user.LockedUntil = null;
                 var refresh = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
                 var session = new Session { UserId = user.Id, RegisterId = registerId, RefreshTokenHash = Hash(refresh), ExpiresOn = DateTime.UtcNow.AddHours(settings.Value.SessionHours) };
-                uow.Sessions.Add(session);
-                uow.Audits.Add(new AuditEvent { OrganizationId = orgId, ActorId = user.Id, EntityId = session.Id, Action = "Auth.Login" });
+                uow.UserRepository.AddSession(session);
+                uow.AuditRepository.AddAuditEvent(new AuditEvent { OrganizationId = orgId, ActorId = user.Id, EntityId = session.Id, Action = "Auth.Login" });
                 return jwt.Create(user, session, refresh);
             }, ct);
             if (result == null) throw new PosException(401, "Invalid credentials or unavailable account/register.");
@@ -58,9 +58,9 @@ namespace UnifiedPOS.Application.Services
             var result = await uow.ExecuteAsync(async () =>
             {
                 var hash = Hash(model.RefreshToken);
-                var session = await uow.Sessions.FindAsync(x => x.RefreshTokenHash == hash && !x.Revoked && x.ExpiresOn > DateTime.UtcNow, ct);
+                var session = await uow.UserRepository.FindSessionAsync(x => x.RefreshTokenHash == hash && !x.Revoked && x.ExpiresOn > DateTime.UtcNow, ct);
                 if (session == null) throw new PosException(401, "Session expired or revoked.");
-                var user = await uow.Users.FindAsync(x => x.Id == session.UserId && x.IsActive, ct) ?? throw new PosException(401, "Account unavailable.");
+                var user = await uow.UserRepository.FindUserAsync(x => x.Id == session.UserId && x.IsActive, ct) ?? throw new PosException(401, "Account unavailable.");
                 var refresh = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
                 session.RefreshTokenHash = Hash(refresh);
                 return jwt.Create(user, session, refresh);
@@ -69,7 +69,7 @@ namespace UnifiedPOS.Application.Services
         }
         public Task<ResponseMessage> LogoutAsync(CancellationToken ct) => uow.ExecuteAsync(async () =>
         {
-            var session = await uow.Sessions.FindAsync(x => x.Id == request.SessionId && x.UserId == request.UserId, ct) ?? throw PosException.Missing();
+            var session = await uow.UserRepository.FindSessionAsync(x => x.Id == request.SessionId && x.UserId == request.UserId, ct) ?? throw PosException.Missing();
             session.Revoked = true;
             return ResponseMessage.Ok();
         }, ct);

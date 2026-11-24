@@ -12,15 +12,15 @@ namespace UnifiedPOS.Application
         {
             services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
             services.AddScoped<IAuthService, AuthService>();
-            services.AddScoped<UserService>();
-            services.AddScoped<OrganizationService>();
-            services.AddScoped<CatalogService>();
-            services.AddScoped<RegisterService>();
-            services.AddScoped<CheckoutService>();
-            services.AddScoped<SalesService>();
-            services.AddScoped<CustomerService>();
-            services.AddScoped<ReportService>();
-            services.AddScoped<PosService>();
+            services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IOrganizationService, OrganizationService>();
+            services.AddScoped<ICatalogService, CatalogService>();
+            services.AddScoped<IRegisterService, RegisterService>();
+            services.AddScoped<ICheckoutService, CheckoutService>();
+            services.AddScoped<ISalesService, SalesService>();
+            services.AddScoped<ICustomerService, CustomerService>();
+            services.AddScoped<IReportService, ReportService>();
+            services.AddScoped<IPosService, PosService>();
             return services;
         }
     }

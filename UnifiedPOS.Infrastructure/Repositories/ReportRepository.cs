@@ -10,6 +10,8 @@ namespace UnifiedPOS.Infrastructure.Repositories
 {
     public class ReportRepository(POSContext context) : IReportRepository
     {
+        public Task<bool> AnyDayClosesAsync(System.Linq.Expressions.Expression<Func<DayClose, bool>> filter, CancellationToken ct = default) => context.Set<DayClose>().AnyAsync(filter, ct);
+        public void AddDayClose(DayClose entity) => context.Set<DayClose>().Add(entity);
         private IQueryable<Sale> Filter(Guid organizationId, ReportFilter filter) => context.Set<Sale>().AsNoTracking().Where(x =>
             x.OrganizationId == organizationId && x.LocationId == filter.LocationId &&
             x.BusinessDate >= filter.FromDate && x.BusinessDate <= filter.ToDate &&

@@ -1,3 +1,4 @@
+using UnifiedPOS.Application.Interfaces.ServiceInterface;
 using Microsoft.Extensions.Options;
 using UnifiedPOS.Application.Common;
 using UnifiedPOS.Application.Interfaces.HelperInterface;
@@ -8,26 +9,26 @@ using static UnifiedPOS.Application.DTOs.CheckoutDTO;
 
 namespace UnifiedPOS.Application.Services
 {
-    public class CheckoutService(IUnitOfWork uow, IRequestContext request, IOptions<PosSettings> settings) : ServiceBase(uow, request)
+    public class CheckoutService(IUnitOfWork uow, IRequestContext request, IOptions<PosSettings> settings) : ServiceBase(uow, request), ICheckoutService
     {
         public Task<ResponseMessage> CreateCartAsync(CartRequest model, string key, CancellationToken ct) => MutateAsync("Cart.Create", key, model, async () =>
         {
             var shift = await ShiftAsync(model.ShiftId, ct); await EnsureCustomerAsync(model.CustomerId, ct);
             var cart = new Cart { ShiftId = shift.Id, CustomerId = model.CustomerId };
-            uow.Carts.Add(cart); Audit("Cart.Created", cart.Id);
+            uow.CheckoutRepository.AddCart(cart); Audit("Cart.Created", cart.Id);
             return Map(cart);
         }, ct);
         public async Task<ResponseMessage> GetCartAsync(Guid id, CancellationToken ct) => ResponseMessage.Ok(Map(await CartAsync(id, ct, false)));
         public async Task<ResponseMessage> GetHeldAsync(Guid shiftId, Pagination page, CancellationToken ct)
         {
             await ShiftAsync(shiftId, ct);
-            return ResponseMessage.Ok(await uow.Carts.PageAsync(x => x.ShiftId == shiftId && x.Status == CartStatus.Held,
+            return ResponseMessage.Ok(await uow.CheckoutRepository.PageCartsAsync(x => x.ShiftId == shiftId && x.Status == CartStatus.Held,
                 x => new { x.Id, x.CustomerId, x.CreatedOn }, page, ct));
         }
         public Task<ResponseMessage> SetLineAsync(Guid id, LineRequest model, string key, CancellationToken ct) => MutateAsync("Cart.Line", key, new { id, model }, async () =>
         {
             var cart = await CartAsync(id, ct);
-            var product = await uow.Products.FindAsync(x => x.Id == model.ProductId && x.OrganizationId == OrgId && x.IsActive && x.MergedIntoId == null, ct) ?? throw PosException.Missing();
+            var product = await uow.CatalogRepository.FindProductAsync(x => x.Id == model.ProductId && x.OrganizationId == OrgId && x.IsActive && x.MergedIntoId == null, ct) ?? throw PosException.Missing();
             var line = cart.Lines.SingleOrDefault(x => x.ProductId == product.Id);
             if (model.Quantity == 0) { if (line != null) cart.Lines.Remove(line); }
             else if (line == null)
@@ -65,7 +66,7 @@ namespace UnifiedPOS.Application.Services
             var shift = await ShiftAsync(cart.ShiftId, ct); var register = await RegisterAsync(shift.RegisterId, ct); var location = await LocationAsync(register.LocationId, ct);
             var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById(location.TimeZoneId)));
             var ids = cart.Lines.Select(x => x.ProductId).ToArray();
-            var products = await uow.Products.ListAsync(x => ids.Contains(x.Id) && x.OrganizationId == OrgId, ct);
+            var products = await uow.CatalogRepository.ListProductsAsync(x => ids.Contains(x.Id) && x.OrganizationId == OrgId, ct);
             if (model.BirthDate > today || products.Any(x => !CheckoutCalculator.IsOldEnough(model.BirthDate, x.MinimumAge, today))) throw PosException.Invalid("Age verification failed.");
             cart.VerifiedBirthDate = model.BirthDate; cart.AgeVerifiedBy = ActorId;
             Audit("Cart.AgeVerified", id, location.Id); return Map(cart);
@@ -81,23 +82,23 @@ namespace UnifiedPOS.Application.Services
             var cart = await CartAsync(id, ct); var shift = await ShiftAsync(cart.ShiftId, ct); var register = await RegisterAsync(shift.RegisterId, ct); var location = await LocationAsync(register.LocationId, ct);
             var quote = await QuoteAsync(cart, ct, true);
             var businessDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById(location.TimeZoneId)));
-            if (await uow.DayCloses.AnyAsync(x => x.LocationId == location.Id && x.BusinessDate == businessDate, ct)) throw PosException.Conflict("Business day is closed.");
+            if (await uow.ReportRepository.AnyDayClosesAsync(x => x.LocationId == location.Id && x.BusinessDate == businessDate, ct)) throw PosException.Conflict("Business day is closed.");
             var sale = new Sale { OrganizationId = OrgId, LocationId = location.Id, RegisterId = register.Id, CashierId = shift.CashierId, ShiftId = shift.Id, CartId = cart.Id, CustomerId = cart.CustomerId, Currency = quote.Currency, BusinessDate = businessDate, Subtotal = quote.Subtotal, Discount = quote.Discount, Tax = quote.Tax, Total = quote.Total };
             sale.Lines = quote.Lines.Select(x => new SaleLine { SaleId = sale.Id, ProductId = x.ProductId, CategoryId = x.CategoryId, Name = x.Name, Sku = x.Sku, Quantity = x.Quantity, UnitPrice = x.UnitPrice, Discount = x.Discount, TaxRate = x.TaxRate, Tax = x.Tax, Total = x.Total }).ToList();
             var productIds = sale.Lines.Select(x => x.ProductId).ToArray();
-            var stocks = await uow.Stocks.ListAsync(x => x.LocationId == location.Id && productIds.Contains(x.ProductId), ct, true);
+            var stocks = await uow.CatalogRepository.ListStocksAsync(x => x.LocationId == location.Id && productIds.Contains(x.ProductId), ct, true);
             foreach (var line in sale.Lines)
             {
                 var stock = stocks.SingleOrDefault(x => x.ProductId == line.ProductId);
-                if (stock == null) { stock = new StoreStock { LocationId = location.Id, ProductId = line.ProductId }; uow.Stocks.Add(stock); }
+                if (stock == null) { stock = new StoreStock { LocationId = location.Id, ProductId = line.ProductId }; uow.CatalogRepository.AddStoreStock(stock); }
                 stock.Quantity -= line.Quantity;
             }
-            uow.Sales.Add(sale); cart.Status = CartStatus.CheckedOut;
+            uow.SalesRepository.AddSale(sale); cart.Status = CartStatus.CheckedOut;
             Audit("Sale.Created", sale.Id, location.Id); return SalesService.Map(sale);
         }, ct);
         private async Task<Cart> CartAsync(Guid id, CancellationToken ct, bool requireOpen = true)
         {
-            var cart = await uow.Carts.FindAsync(x => x.Id == id, ct) ?? throw PosException.Missing();
+            var cart = await uow.CheckoutRepository.FindCartAsync(x => x.Id == id, ct) ?? throw PosException.Missing();
             await ShiftAsync(cart.ShiftId, ct);
             if (requireOpen && cart.Status != CartStatus.Open) throw PosException.Conflict("Cart is not open.");
             return cart;
@@ -106,10 +107,10 @@ namespace UnifiedPOS.Application.Services
         {
             if (cart.Lines.Count == 0) throw PosException.Invalid("Cart is empty.");
             var shift = await ShiftAsync(cart.ShiftId, ct); var register = await RegisterAsync(shift.RegisterId, ct); var location = await LocationAsync(register.LocationId, ct);
-            var organization = await uow.Organizations.FindAsync(x => x.Id == OrgId, ct) ?? throw PosException.Missing();
+            var organization = await uow.OrganizationRepository.FindOrganizationAsync(x => x.Id == OrgId, ct) ?? throw PosException.Missing();
             var ids = cart.Lines.Select(x => x.ProductId).ToArray();
-            var products = await uow.Products.ListAsync(x => x.OrganizationId == OrgId && ids.Contains(x.Id), ct);
-            var stocks = await uow.Stocks.ListAsync(x => x.LocationId == location.Id && ids.Contains(x.ProductId), ct);
+            var products = await uow.CatalogRepository.ListProductsAsync(x => x.OrganizationId == OrgId && ids.Contains(x.Id), ct);
+            var stocks = await uow.CatalogRepository.ListStocksAsync(x => x.LocationId == location.Id && ids.Contains(x.ProductId), ct);
             var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById(location.TimeZoneId)));
             var items = new List<(Product, decimal)>();
             foreach (var line in cart.Lines)

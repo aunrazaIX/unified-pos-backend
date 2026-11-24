@@ -1,6 +1,4 @@
-using UnifiedPOS.Domain.Entities;
 using UnifiedPOS.Domain.Enums;
-using static UnifiedPOS.Application.DTOs.AuthDTO;
 
 namespace UnifiedPOS.Application.Interfaces.HelperInterface
 {
@@ -12,5 +10,4 @@ namespace UnifiedPOS.Application.Interfaces.HelperInterface
         Guid? RegisterId { get; }
         UserRole Role { get; }
     }
-    public interface IJwtService { TokenResponse Create(User user, Session session, string refreshToken); }
 }

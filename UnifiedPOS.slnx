@@ -4,4 +4,5 @@
   <Project Path="UnifiedPOS.Domain/UnifiedPOS.Domain.csproj" />
   <Project Path="UnifiedPOS.Infrastructure/UnifiedPOS.Infrastructure.csproj" />
   <Project Path="UnifiedPOS.BackgroundServices/UnifiedPOS.BackgroundServices.csproj" />
+  <Project Path="UnifiedPOS.Tests/UnifiedPOS.Tests.csproj" />
 </Solution>

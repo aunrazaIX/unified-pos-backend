@@ -1,3 +1,4 @@
+using UnifiedPOS.Application.Interfaces.ServiceInterface;
 using System.Text.Json;
 using UnifiedPOS.Application.Common;
 using UnifiedPOS.Application.Interfaces.HelperInterface;
@@ -9,7 +10,7 @@ using static UnifiedPOS.Application.DTOs.RegisterDTO;
 
 namespace UnifiedPOS.Application.Services
 {
-    public class SalesService(IUnitOfWork uow, IRequestContext request) : ServiceBase(uow, request)
+    public class SalesService(IUnitOfWork uow, IRequestContext request) : ServiceBase(uow, request), ISalesService
     {
         public async Task<ResponseMessage> GetSaleAsync(Guid id, CancellationToken ct) => ResponseMessage.Ok(Map(await SaleAsync(id, ct)));
         public Task<ResponseMessage> AddPaymentAsync(Guid id, PaymentRequest model, string key, CancellationToken ct) => MutateAsync("Sale.Payment", key, new { id, model }, async () =>
@@ -58,9 +59,9 @@ namespace UnifiedPOS.Application.Services
                 refund.Lines.Add(new RefundLine { RefundId = refund.Id, SaleLineId = line.Id, Quantity = input.Quantity, Amount = amount });
                 refund.Amount += amount; quantities[line.ProductId] = quantities.GetValueOrDefault(line.ProductId) + input.Quantity;
             }
-            if (await uow.Reports.RefundTotalAsync(id, ct) + refund.Amount > sale.Payments.Sum(x => x.Amount)) throw PosException.Conflict("Refund exceeds paid amount.");
+            if (await uow.ReportRepository.RefundTotalAsync(id, ct) + refund.Amount > sale.Payments.Sum(x => x.Amount)) throw PosException.Conflict("Refund exceeds paid amount.");
             await RestoreInventoryAsync(sale.LocationId, quantities, ct);
-            uow.Refunds.Add(refund); Event("Sale.Refunded", sale, new { refund.Id, SaleId = id, refund.Amount });
+            uow.SalesRepository.AddRefund(refund); Event("Sale.Refunded", sale, new { refund.Id, SaleId = id, refund.Amount });
             Audit("Sale.Refunded", refund.Id, sale.LocationId, model.Reason);
             return new RefundResponse(refund.Id, id, refund.Amount);
         }, ct);
@@ -69,7 +70,7 @@ namespace UnifiedPOS.Application.Services
             RequireManager(); var sale = await SaleAsync(id, ct); await ShiftAsync(sale.ShiftId, ct);
             if (sale.Status != SaleStatus.Pending) throw PosException.Conflict("Only pending sales can be voided. Refund completed sales instead.");
             var paid = sale.Payments.Sum(x => x.Amount);
-            if (paid > 0) uow.Refunds.Add(new Refund { SaleId = id, ShiftId = sale.ShiftId, ApprovedBy = ActorId, Reason = model.Reason, Amount = paid });
+            if (paid > 0) uow.SalesRepository.AddRefund(new Refund { SaleId = id, ShiftId = sale.ShiftId, ApprovedBy = ActorId, Reason = model.Reason, Amount = paid });
             await RestoreInventoryAsync(sale.LocationId, sale.Lines.GroupBy(x => x.ProductId).ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity)), ct);
             sale.Status = SaleStatus.Voided; Event("Sale.Voided", sale, new { sale.Id, CashToReturn = paid });
             Audit("Sale.Voided", id, sale.LocationId, model.Reason); return new { Sale = Map(sale), CashToReturn = paid };
@@ -77,7 +78,7 @@ namespace UnifiedPOS.Application.Services
         private async Task RestoreInventoryAsync(Guid locationId, Dictionary<Guid, decimal> quantities, CancellationToken ct)
         {
             var ids = quantities.Keys.ToArray();
-            var products = await uow.Products.ListAsync(x => x.OrganizationId == OrgId && ids.Contains(x.Id), ct);
+            var products = await uow.CatalogRepository.ListProductsAsync(x => x.OrganizationId == OrgId && ids.Contains(x.Id), ct);
             var restored = new Dictionary<Guid, decimal>();
             foreach (var product in products)
             {
@@ -85,23 +86,23 @@ namespace UnifiedPOS.Application.Services
                 restored[targetId] = restored.GetValueOrDefault(targetId) + quantities[product.Id];
             }
             var targetIds = restored.Keys.ToArray();
-            var stocks = await uow.Stocks.ListAsync(x => x.LocationId == locationId && targetIds.Contains(x.ProductId), ct, true);
+            var stocks = await uow.CatalogRepository.ListStocksAsync(x => x.LocationId == locationId && targetIds.Contains(x.ProductId), ct, true);
             foreach (var (productId, quantity) in restored)
             {
                 var stock = stocks.SingleOrDefault(x => x.ProductId == productId);
-                if (stock == null) { stock = new StoreStock { LocationId = locationId, ProductId = productId }; uow.Stocks.Add(stock); }
+                if (stock == null) { stock = new StoreStock { LocationId = locationId, ProductId = productId }; uow.CatalogRepository.AddStoreStock(stock); }
                 stock.Quantity += quantity;
             }
         }
         private async Task<Sale> SaleAsync(Guid id, CancellationToken ct)
         {
-            var sale = await uow.Sales.FindAsync(x => x.Id == id && x.OrganizationId == OrgId, ct) ?? throw PosException.Missing();
+            var sale = await uow.SalesRepository.FindSaleAsync(x => x.Id == id && x.OrganizationId == OrgId, ct) ?? throw PosException.Missing();
             await LocationAsync(sale.LocationId, ct);
             if (request.RegisterId.HasValue && request.RegisterId != sale.RegisterId) throw PosException.Forbidden();
             if (!IsManager && sale.CashierId != ActorId) throw PosException.Forbidden();
             return sale;
         }
-        private void Event<T>(string type, Sale sale, T payload) => uow.Outbox.Add(new OutboxMessage { OrganizationId = OrgId, AggregateId = type == "Sale.Refunded" ? Guid.NewGuid() : sale.Id, Type = type, Payload = JsonSerializer.Serialize(payload) });
+        private void Event<T>(string type, Sale sale, T payload) => uow.OutboxRepository.AddOutboxMessage(new OutboxMessage { OrganizationId = OrgId, AggregateId = type == "Sale.Refunded" ? Guid.NewGuid() : sale.Id, Type = type, Payload = JsonSerializer.Serialize(payload) });
         public static SaleResponse Map(Sale x) => new(x.Id, x.LocationId, x.RegisterId, x.CashierId, x.ShiftId, x.CustomerId, x.Status, x.Currency, x.Subtotal, x.Discount, x.Tax, x.Total, x.Payments.Sum(p => p.Amount), x.ReceiptNumber, x.CompletedOn,
             x.Lines.Select(l => new SaleLineResponse(l.Id, l.ProductId, l.Name, l.Sku, l.Quantity, l.UnitPrice, l.Discount, l.TaxRate, l.Tax, l.Total, l.RefundedQuantity, l.RefundedAmount)).ToArray(),
             x.Payments.Select(p => new PaymentResponse(p.Id, p.Tender, p.Amount, p.Received, p.Change)).ToArray());

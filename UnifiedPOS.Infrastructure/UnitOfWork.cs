@@ -9,24 +9,39 @@ namespace UnifiedPOS.Infrastructure
 {
     public class UnitOfWork(POSContext context) : IUnitOfWork
     {
-        public IRepository<Organization> Organizations { get; } = new Repository<Organization>(context);
-        public IRepository<Location> Locations { get; } = new Repository<Location>(context);
-        public IRepository<Register> Registers { get; } = new Repository<Register>(context);
-        public IRepository<User> Users { get; } = new Repository<User>(context);
-        public IRepository<Session> Sessions { get; } = new Repository<Session>(context);
-        public IRepository<Category> Categories { get; } = new Repository<Category>(context);
-        public IRepository<Product> Products { get; } = new Repository<Product>(context);
-        public IRepository<StoreStock> Stocks { get; } = new Repository<StoreStock>(context);
-        public IRepository<Customer> Customers { get; } = new Repository<Customer>(context);
-        public IRepository<Shift> Shifts { get; } = new Repository<Shift>(context);
-        public IRepository<Cart> Carts { get; } = new Repository<Cart>(context);
-        public IRepository<Sale> Sales { get; } = new Repository<Sale>(context);
-        public IRepository<Refund> Refunds { get; } = new Repository<Refund>(context);
-        public IRepository<AuditEvent> Audits { get; } = new Repository<AuditEvent>(context);
-        public IRepository<Operation> Operations { get; } = new Repository<Operation>(context);
-        public IRepository<OutboxMessage> Outbox { get; } = new Repository<OutboxMessage>(context);
-        public IRepository<DayClose> DayCloses { get; } = new Repository<DayClose>(context);
-        public IReportRepository Reports { get; } = new ReportRepository(context);
+        private IOrganizationRepository? _organizationRepository;
+        public IOrganizationRepository OrganizationRepository => _organizationRepository ??= new OrganizationRepository(context);
+
+        private IUserRepository? _userRepository;
+        public IUserRepository UserRepository => _userRepository ??= new UserRepository(context);
+
+        private ICatalogRepository? _catalogRepository;
+        public ICatalogRepository CatalogRepository => _catalogRepository ??= new CatalogRepository(context);
+
+        private ICustomerRepository? _customerRepository;
+        public ICustomerRepository CustomerRepository => _customerRepository ??= new CustomerRepository(context);
+
+        private IRegisterRepository? _registerRepository;
+        public IRegisterRepository RegisterRepository => _registerRepository ??= new RegisterRepository(context);
+
+        private ICheckoutRepository? _checkoutRepository;
+        public ICheckoutRepository CheckoutRepository => _checkoutRepository ??= new CheckoutRepository(context);
+
+        private ISalesRepository? _salesRepository;
+        public ISalesRepository SalesRepository => _salesRepository ??= new SalesRepository(context);
+
+        private IAuditRepository? _auditRepository;
+        public IAuditRepository AuditRepository => _auditRepository ??= new AuditRepository(context);
+
+        private IOperationRepository? _operationRepository;
+        public IOperationRepository OperationRepository => _operationRepository ??= new OperationRepository(context);
+
+        private IOutboxRepository? _outboxRepository;
+        public IOutboxRepository OutboxRepository => _outboxRepository ??= new OutboxRepository(context);
+
+        private IReportRepository? _reportRepository;
+        public IReportRepository ReportRepository => _reportRepository ??= new ReportRepository(context);
+
         public async Task SaveChangesAsync(CancellationToken ct = default) => await context.SaveChangesAsync(ct);
         public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, CancellationToken ct = default)
         {

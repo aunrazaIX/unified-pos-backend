@@ -1,3 +1,4 @@
+using UnifiedPOS.Application.Interfaces.ServiceInterface;
 using System.Globalization;
 using System.Text;
 using UnifiedPOS.Application.Common;
@@ -9,7 +10,7 @@ using static UnifiedPOS.Application.DTOs.ReportDTO;
 
 namespace UnifiedPOS.Application.Services
 {
-    public class ReportService(IUnitOfWork uow, IRequestContext request) : ServiceBase(uow, request)
+    public class ReportService(IUnitOfWork uow, IRequestContext request) : ServiceBase(uow, request), IReportService
     {
         private async Task ValidateAsync(ReportFilter filter, CancellationToken ct)
         {
@@ -19,16 +20,16 @@ namespace UnifiedPOS.Application.Services
         }
         public async Task<ResponseMessage> DashboardAsync(ReportFilter filter, CancellationToken ct)
         {
-            await ValidateAsync(filter, ct); return ResponseMessage.Ok(await uow.Reports.SummaryAsync(OrgId, filter, ct));
+            await ValidateAsync(filter, ct); return ResponseMessage.Ok(await uow.ReportRepository.SummaryAsync(OrgId, filter, ct));
         }
         public async Task<ResponseMessage> SalesAsync(ReportFilter filter, CancellationToken ct)
         {
-            await ValidateAsync(filter, ct); return ResponseMessage.Ok(await uow.Reports.SalesAsync(OrgId, filter, ct));
+            await ValidateAsync(filter, ct); return ResponseMessage.Ok(await uow.ReportRepository.SalesAsync(OrgId, filter, ct));
         }
         public async Task<string> ExportAsync(ReportFilter filter, CancellationToken ct)
         {
             await ValidateAsync(filter, ct);
-            var rows = await uow.Reports.SalesAsync(OrgId, filter, ct);
+            var rows = await uow.ReportRepository.SalesAsync(OrgId, filter, ct);
             var csv = new StringBuilder("SaleId,ReceiptNumber,CompletedOn,BusinessDate,RegisterId,CashierId,Status,Total,Discount,Tax\r\n");
             foreach (var row in rows.Items)
                 csv.AppendLine(string.Join(',', row.Id, row.ReceiptNumber, row.CompletedOn?.ToString("O", CultureInfo.InvariantCulture), row.BusinessDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), row.RegisterId, row.CashierId, row.Status, row.Total.ToString(CultureInfo.InvariantCulture), row.Discount.ToString(CultureInfo.InvariantCulture), row.Tax.ToString(CultureInfo.InvariantCulture)));
@@ -38,7 +39,7 @@ namespace UnifiedPOS.Application.Services
         {
             RequireManager(); await LocationAsync(locationId, ct);
             var orgAdmin = request.Role is UserRole.Owner or UserRole.Admin;
-            return ResponseMessage.Ok(await uow.Audits.PageAsync(x => x.OrganizationId == OrgId && (x.LocationId == locationId || (orgAdmin && x.LocationId == null)),
+            return ResponseMessage.Ok(await uow.AuditRepository.PageAuditsAsync(x => x.OrganizationId == OrgId && (x.LocationId == locationId || (orgAdmin && x.LocationId == null)),
                 x => new AuditResponse(x.Id, x.CreatedOn, x.ActorId, x.Action, x.EntityId, x.Reason), page, ct));
         }
         public Task<ResponseMessage> CloseDayAsync(DayCloseRequest model, string key, CancellationToken ct) => MutateAsync("Day.Close", key, model, async () =>
@@ -46,11 +47,11 @@ namespace UnifiedPOS.Application.Services
             RequireManager(); var location = await LocationAsync(model.LocationId, ct);
             var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById(location.TimeZoneId)));
             if (model.BusinessDate == default || model.BusinessDate >= today) throw PosException.Invalid("Only a past business day can be closed.");
-            if (await uow.DayCloses.AnyAsync(x => x.LocationId == location.Id && x.BusinessDate == model.BusinessDate, ct)) throw PosException.Conflict("Business day already closed.");
-            if (await uow.Sales.AnyAsync(x => x.LocationId == location.Id && x.BusinessDate == model.BusinessDate && x.Status == SaleStatus.Pending, ct)) throw PosException.Conflict("Pending sales must be resolved before day close.");
-            var totals = await uow.Reports.SummaryAsync(OrgId, new ReportFilter { LocationId = location.Id, FromDate = model.BusinessDate, ToDate = model.BusinessDate }, ct);
+            if (await uow.ReportRepository.AnyDayClosesAsync(x => x.LocationId == location.Id && x.BusinessDate == model.BusinessDate, ct)) throw PosException.Conflict("Business day already closed.");
+            if (await uow.SalesRepository.AnySalesAsync(x => x.LocationId == location.Id && x.BusinessDate == model.BusinessDate && x.Status == SaleStatus.Pending, ct)) throw PosException.Conflict("Pending sales must be resolved before day close.");
+            var totals = await uow.ReportRepository.SummaryAsync(OrgId, new ReportFilter { LocationId = location.Id, FromDate = model.BusinessDate, ToDate = model.BusinessDate }, ct);
             var close = new DayClose { LocationId = location.Id, BusinessDate = model.BusinessDate, ClosedBy = ActorId, SalesTotal = totals.GrossSales, RefundTotal = totals.Refunds };
-            uow.DayCloses.Add(close); Audit("Day.Closed", close.Id, location.Id);
+            uow.ReportRepository.AddDayClose(close); Audit("Day.Closed", close.Id, location.Id);
             return new { close.Id, close.BusinessDate, close.SalesTotal, close.RefundTotal, OfflineDataMayBePending = true };
         }, ct);
     }

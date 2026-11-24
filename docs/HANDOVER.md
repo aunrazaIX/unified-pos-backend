@@ -1,7 +1,34 @@
 # Unified POS backend handover
 
 Date: 2026-11-24 (Asia/Karachi)
-Status: DEVELOPMENT PAUSED at the user's request. Do not resume implementation until asked.
+Status: Development resumed at the user's request on 2026-11-24. The structural correction is implemented; functional module completion remains outstanding.
+
+## Resumed development checkpoint
+
+The current reference project is `D:\Aun\igi-health-connect-portal`. Its entity, DTO, role service/repository, unit-of-work, and registration conventions were inspected again. The reference project was only read.
+
+Completed structural changes:
+
+- Split the consolidated entity file into 23 individual class files and the enum file into four enum files, preserving declarations and values.
+- Split common contracts/options/helpers into individual files and DTO containers into seven module files; separated the JWT helper interface.
+- Added nine service interfaces alongside the existing auth interface; registered all ten application services through scoped interfaces.
+- Replaced the public generic repository contract with named module repository interfaces and implementations. Services access Organization, User, Catalog, Customer, Register, Checkout, Sales, Audit, Operation, Outbox, and Report repositories through the unit of work. Repository instances are created lazily and reused within the scoped unit of work.
+- Kept query execution in infrastructure, navigation loading in the relevant repositories, and shared projection pagination in an internal helper. Existing query limits and transaction behavior remain unchanged and still require the audits listed below.
+- Added `UnifiedPOS.Tests` to the solution with test-only xUnit/test SDK dependencies. Architecture tests cover service-interface registration, repository instance reuse, and SQL Server model discovery/concurrency tokens without opening a database connection.
+- Updated README to describe the actual development state.
+
+Validation executed for this checkpoint:
+
+- `dotnet restore UnifiedPOS.slnx`: succeeded after retrying outside the sandbox because sandboxed NuGet TLS failed. Existing NU1902/NU1903 warnings remain for transitive `System.Security.Cryptography.Pkcs` 9.0.11.
+- `dotnet test UnifiedPOS.slnx --no-restore`: passed all three architecture tests; no tests were skipped.
+- `dotnet build UnifiedPOS.slnx --no-restore`: succeeded for all six projects with zero errors and eight dependency-advisory warnings.
+- `git diff --check`: passed.
+
+The package advisories ([moderate](https://github.com/advisories/GHSA-2fmv-rv2c-59x7), [high](https://github.com/advisories/GHSA-846f-f764-76mx)) list 9.0.21 or 10.0.13 as patched versions for the reported issues. Investigate the dependency chain and apply a compatible security update before release; no production dependency version was changed during this structural correction.
+
+No business API was enabled and no database was accessed or changed. No credentials from the previous conversation were available in this session; use secure configuration when resuming database work.
+
+The sections below preserve the earlier handover and its known functional gaps. Descriptions of consolidated files, missing interfaces, untracked files, and unexecuted builds/tests in those historical sections describe the previous paused snapshot, not this checkpoint. The repository was clean on `main` at commit `2d0100c` when this continuation started.
 
 ## User requirements and latest correction
 
