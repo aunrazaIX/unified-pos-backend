@@ -13,7 +13,7 @@ public sealed class OwnerProvisioner(POSContext context, IPasswordHasher<User> h
     public async Task ProvisionAsync(BootstrapOptions options, bool isDevelopment, CancellationToken ct = default)
     {
         if (!options.Enabled) { logger.LogInformation("Owner provisioning skipped."); return; }
-        if (!options.IsValid() || (!isDevelopment && !options.AllowProduction))
+        if (!options.IsValid() || (!isDevelopment && (!options.AllowProduction || options.AllowDevelopmentShortPassword)))
             throw new InvalidOperationException("Bootstrap configuration is invalid or provisioning is not enabled for this environment.");
 
         await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>

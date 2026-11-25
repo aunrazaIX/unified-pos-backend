@@ -10,6 +10,20 @@ namespace UnifiedPOS.Tests;
 
 public class BootstrapTests
 {
+    [Fact]
+    public async Task DevelopmentPasswordExceptionCannotBeEnabledInProduction()
+    {
+        var options = ValidOptions();
+        options.OwnerPassword = new string('x', 9);
+        options.AllowDevelopmentShortPassword = true;
+        options.AllowProduction = true;
+        Assert.True(options.IsValid());
+        using var context = new POSContext(new DbContextOptionsBuilder<POSContext>().UseSqlServer().Options);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new OwnerProvisioner(context, new PasswordHasher<User>(), NullLogger<OwnerProvisioner>.Instance)
+                .ProvisionAsync(options, false));
+    }
+
     [Theory]
     [InlineData(0, false)]
     [InlineData(8, false)]

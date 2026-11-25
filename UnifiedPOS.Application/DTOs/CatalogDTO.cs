@@ -5,6 +5,11 @@ namespace UnifiedPOS.Application.DTOs
     public static class CatalogDTO
     {
         public class CategoryRequest { [Required, StringLength(100)] public string Name { get; set; } = ""; }
+        public class ReviewRequest
+        {
+            public bool Approved { get; set; }
+            [Required, StringLength(300)] public string Reason { get; set; } = "";
+        }
         public class ProductRequest
         {
             public Guid CategoryId { get; set; }

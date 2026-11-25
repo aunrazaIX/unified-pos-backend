@@ -9,6 +9,27 @@ namespace UnifiedPOS.Application.Services
 {
     public class CatalogService(IUnitOfWork uow, IRequestContext request) : ServiceBase(uow, request), ICatalogService
     {
+        public async Task<ResponseMessage> GetReviewQueueAsync(Pagination page, CancellationToken ct)
+        {
+            RequireManager();
+            var user = await uow.UserRepository.FindUserAsync(x => x.Id == ActorId && x.OrganizationId == OrgId, ct) ?? throw PosException.Forbidden();
+            var locations = user.Locations.Select(x => x.LocationId).ToArray();
+            var all = request.Role is UnifiedPOS.Domain.Enums.UserRole.Owner or UnifiedPOS.Domain.Enums.UserRole.Admin;
+            return ResponseMessage.Ok(await uow.CatalogRepository.PageProductsAsync(x => x.OrganizationId == OrgId && x.PendingReview && (all || (x.SubmittedAtLocationId.HasValue && locations.Contains(x.SubmittedAtLocationId.Value))),
+                x => new { x.Id, x.Name, x.Sku, x.Barcode, x.Price, x.CategoryId, x.SubmittedAtLocationId, x.CreatedOn }, page, ct));
+        }
+        public Task<ResponseMessage> ReviewProductAsync(Guid id, ReviewRequest model, string key, CancellationToken ct) => MutateAsync("Product.Review", key, new { id, model }, async () =>
+        {
+            RequireManager();
+            if (string.IsNullOrWhiteSpace(model.Reason)) throw PosException.Invalid("Review reason is required.");
+            var product = await ProductAsync(id, ct);
+            if (!product.PendingReview) throw PosException.Conflict("Product is not pending review.");
+            if (product.SubmittedAtLocationId.HasValue) await LocationAsync(product.SubmittedAtLocationId.Value, ct);
+            product.PendingReview = false; product.IsActive = model.Approved;
+            product.ReviewedBy = ActorId; product.ReviewedOn = DateTime.UtcNow; product.ReviewReason = model.Reason.Trim();
+            Audit(model.Approved ? "Product.Approved" : "Product.Rejected", id, product.SubmittedAtLocationId, model.Reason.Trim());
+            return Map(product);
+        }, ct);
         public Task<ResponseMessage> AddCategoryAsync(CategoryRequest model, string key, CancellationToken ct) => MutateAsync("Category.Create", key, model, () =>
         {
             RequireManager();
@@ -31,6 +52,15 @@ namespace UnifiedPOS.Application.Services
         public Task<ResponseMessage> SaveProductAsync(Guid? id, ProductRequest model, string key, CancellationToken ct) => MutateAsync("Product.Save", key, new { id, model }, async () =>
         {
             if (id.HasValue) RequireManager();
+            Guid? submissionLocation = null;
+            if (!IsManager)
+            {
+                if (!request.RegisterId.HasValue) throw PosException.Forbidden();
+                var register = await RegisterAsync(request.RegisterId.Value, ct);
+                var location = await LocationAsync(register.LocationId, ct);
+                if (!location.IsActive || string.IsNullOrWhiteSpace(model.Barcode)) throw PosException.Invalid("An active store and barcode are required.");
+                submissionLocation = location.Id;
+            }
             Money.Validate(model.Price);
             if (!await uow.CatalogRepository.AnyCategoriesAsync(x => x.Id == model.CategoryId && x.OrganizationId == OrgId, ct)) throw PosException.Invalid("Unknown category.");
             if (model.ParentProductId.HasValue && (!await uow.CatalogRepository.AnyProductsAsync(x => x.Id == model.ParentProductId && x.OrganizationId == OrgId && x.ParentProductId == null && x.MergedIntoId == null, ct) || model.ParentProductId == id)) throw PosException.Invalid("Invalid variant parent.");
@@ -41,6 +71,7 @@ namespace UnifiedPOS.Application.Services
             if (!model.ConfirmSimilarName && await uow.CatalogRepository.AnyProductsAsync(x => x.OrganizationId == OrgId && x.Id != id && x.MergedIntoId == null && (x.Name.Contains(name) || name.Contains(x.Name)), ct)) throw PosException.Conflict("Similar product name exists. Select it or explicitly confirm creation.");
             var product = id.HasValue ? await uow.CatalogRepository.FindProductAsync(x => x.Id == id && x.OrganizationId == OrgId, ct) ?? throw PosException.Missing() : new Product { OrganizationId = OrgId };
             if (product.MergedIntoId.HasValue) throw PosException.Conflict("Merged products cannot be edited.");
+            if (!id.HasValue && !IsManager) { product.PendingReview = true; product.SubmittedAtLocationId = submissionLocation; }
             product.Name = name; product.Sku = sku; product.Barcode = barcode; product.Price = model.Price; product.CategoryId = model.CategoryId;
             product.ParentProductId = model.ParentProductId; product.MinimumAge = model.MinimumAge; product.IsTaxable = model.IsTaxable; product.IsActive = model.IsActive;
             if (!id.HasValue) uow.CatalogRepository.AddProduct(product);

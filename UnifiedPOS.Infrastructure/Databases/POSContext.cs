@@ -12,6 +12,8 @@ namespace UnifiedPOS.Infrastructure.Databases
             {
                 var entity = modelBuilder.Entity(type);
                 entity.HasKey(nameof(Entity.Id));
+                // IDs are assigned by Entity; new navigation children must be inserted.
+                entity.Property(nameof(Entity.Id)).ValueGeneratedNever();
                 entity.Property(nameof(Entity.Version)).IsRowVersion();
                 foreach (var property in type.GetProperties().Where(p => p.PropertyType == typeof(string)))
                     entity.Property(property.Name).HasMaxLength(1000);

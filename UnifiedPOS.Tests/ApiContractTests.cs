@@ -14,6 +14,16 @@ namespace UnifiedPOS.Tests;
 
 public class ApiContractTests
 {
+    [Theory]
+    [InlineData(nameof(CatalogController.ReviewQueue))]
+    [InlineData(nameof(CatalogController.Review))]
+    public void CatalogReviewRequiresManagerRole(string method)
+    {
+        var authorization = typeof(CatalogController).GetMethod(method)!.GetCustomAttribute<AuthorizeAttribute>();
+        Assert.Equal(Roles.Managers, authorization?.Roles);
+        Assert.DoesNotContain("Cashier", authorization!.Roles!);
+    }
+
     private static readonly Type[] Controllers = typeof(AuthController).Assembly.GetTypes()
         .Where(x => x.IsClass && !x.IsAbstract && typeof(ControllerBase).IsAssignableFrom(x)).ToArray();
 

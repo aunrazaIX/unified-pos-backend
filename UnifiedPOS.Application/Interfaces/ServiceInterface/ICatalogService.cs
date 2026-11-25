@@ -5,6 +5,8 @@ namespace UnifiedPOS.Application.Interfaces.ServiceInterface
 {
     public interface ICatalogService
     {
+        Task<ResponseMessage> GetReviewQueueAsync(Pagination page, CancellationToken ct);
+        Task<ResponseMessage> ReviewProductAsync(Guid id, ReviewRequest model, string key, CancellationToken ct);
         Task<ResponseMessage> AddCategoryAsync(CategoryRequest model, string key, CancellationToken ct);
         Task<ResponseMessage> GetCategoriesAsync(Pagination page, CancellationToken ct);
         Task<ResponseMessage> GetProductsAsync(Pagination page, CancellationToken ct);

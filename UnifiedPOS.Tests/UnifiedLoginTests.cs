@@ -9,6 +9,18 @@ namespace UnifiedPOS.Tests;
 public class UnifiedLoginTests
 {
     [Fact]
+    public void LoginAcceptsExistingShortPasswordButCreationRetainsPolicy()
+    {
+        var login = new AuthDTO.LoginRequest { UserName = "existing-user", Password = "123456789" };
+        var errors = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+        Assert.True(System.ComponentModel.DataAnnotations.Validator.TryValidateObject(login,
+            new System.ComponentModel.DataAnnotations.ValidationContext(login), errors, true));
+        var create = new AuthDTO.UserRequest { UserName = "new-user", Password = "123456789" };
+        Assert.False(System.ComponentModel.DataAnnotations.Validator.TryValidateObject(create,
+            new System.ComponentModel.DataAnnotations.ValidationContext(create), errors, true));
+    }
+
+    [Fact]
     public void LoginDoesNotRequireOrganizationIdentity()
     {
         Assert.Null(typeof(AuthDTO.LoginRequest).GetProperty("OrganizationId"));

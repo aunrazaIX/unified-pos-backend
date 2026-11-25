@@ -8,7 +8,7 @@ namespace UnifiedPOS.Application.DTOs
         public class LoginRequest
         {
             [Required, StringLength(100)] public string UserName { get; set; } = "";
-            [Required, StringLength(128, MinimumLength = 12)] public string Password { get; set; } = "";
+            [Required, StringLength(128)] public string Password { get; set; } = "";
         }
         public class PinRequest
         {
@@ -36,6 +36,6 @@ namespace UnifiedPOS.Application.DTOs
         public class RegistersRequest { [Required, MaxLength(100)] public Guid[] RegisterIds { get; set; } = []; }
         public class SelectRegisterRequest { public Guid RegisterId { get; set; } }
         public record TokenResponse(string AccessToken, string RefreshToken, DateTime ExpiresOn, Guid UserId = default, Guid OrganizationId = default, UserRole Role = default, Guid? RegisterId = null);
-        public record UserResponse(Guid Id, string UserName, UserRole Role, bool IsActive, Guid[] LocationIds);
+        public record UserResponse(Guid Id, string UserName, UserRole Role, bool IsActive, Guid[] LocationIds, Guid[] RegisterIds);
     }
 }

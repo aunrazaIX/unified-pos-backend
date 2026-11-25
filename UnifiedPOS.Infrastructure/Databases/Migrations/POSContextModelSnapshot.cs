@@ -544,14 +544,30 @@ namespace UnifiedPOS.Infrastructure.Databases.Migrations
                     b.Property<Guid?>("ParentProductId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("PendingReview")
+                        .HasColumnType("bit");
+
                     b.Property<decimal>("Price")
                         .HasPrecision(19, 4)
                         .HasColumnType("decimal(19,4)");
+
+                    b.Property<string>("ReviewReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("ReviewedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ReviewedOn")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Sku")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("SubmittedAtLocationId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<byte[]>("Version")
                         .IsConcurrencyToken()

@@ -15,7 +15,7 @@ namespace UnifiedPOS.Application.Services
         {
             RequireAdmin();
             return ResponseMessage.Ok(await uow.UserRepository.PageUsersAsync(x => x.OrganizationId == OrgId && (page.SearchString == null || x.UserName.Contains(page.SearchString)),
-                x => new UserResponse(x.Id, x.UserName, x.Role, x.IsActive, x.Locations.Select(l => l.LocationId).ToArray()), page, ct));
+                x => new UserResponse(x.Id, x.UserName, x.Role, x.IsActive, x.Locations.Select(l => l.LocationId).ToArray(), x.Registers.Select(r => r.RegisterId).ToArray()), page, ct));
         }
         public Task<ResponseMessage> AddUserAsync(UserRequest model, string key, CancellationToken ct) => MutateAsync("User.Create", key, model, async () =>
         {
@@ -29,7 +29,7 @@ namespace UnifiedPOS.Application.Services
             user.Locations = ids.Select(id => new UserLocation { UserId = user.Id, LocationId = id }).ToList();
             uow.UserRepository.AddUser(user);
             Audit("User.Created", user.Id);
-            return new UserResponse(user.Id, user.UserName, user.Role, user.IsActive, ids);
+            return new UserResponse(user.Id, user.UserName, user.Role, user.IsActive, ids, []);
         }, ct);
         private async Task ValidateLocationsAsync(Guid[] ids, CancellationToken ct)
         {
