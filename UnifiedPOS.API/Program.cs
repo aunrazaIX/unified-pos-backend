@@ -9,6 +9,7 @@ using UnifiedPOS.Application;
 using UnifiedPOS.Application.Common;
 using UnifiedPOS.Application.Interfaces.HelperInterface;
 using UnifiedPOS.Infrastructure;
+using UnifiedPOS.Infrastructure.Bootstrap;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,8 +56,19 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddApplicationLayer();
 builder.Services.AddInfrastructureLayer(builder.Configuration);
 builder.Services.AddOpenApi();
+builder.Services.AddOptions<BootstrapOptions>().Bind(builder.Configuration.GetSection("Bootstrap"))
+    .Validate(options => options.IsValid(), "Bootstrap requires organization name, uppercase three-letter currency, owner username, and a password of 12–128 characters.")
+    .Validate(options => !options.Enabled || builder.Environment.IsDevelopment() || options.AllowProduction,
+        "Bootstrap is restricted to Development unless Bootstrap:AllowProduction is enabled.")
+    .ValidateOnStart();
+builder.Services.AddScoped<OwnerProvisioner>();
 
 var app = builder.Build();
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var options = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<BootstrapOptions>>().Value;
+    await scope.ServiceProvider.GetRequiredService<OwnerProvisioner>().ProvisionAsync(options, app.Environment.IsDevelopment());
+}
 app.UseExceptionHandler();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseHttpsRedirection();

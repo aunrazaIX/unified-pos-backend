@@ -1,5 +1,24 @@
 # Unified POS backend
 
+## Initial Owner provisioning
+
+Owner is the super-admin persona within the current single organization. Owner and Admin may create/update locations and registers and manage users and assignments. Manager and Cashier cannot perform these mutations, including PIN resets. Owner location access is role-based and automatically includes future locations; assignment rows are not required.
+
+Bootstrap is disabled by default. In Development configure the following with environment variables (`:` becomes `__`) or API project user secrets:
+
+```powershell
+dotnet user-secrets set "Bootstrap:Enabled" "true" --project UnifiedPOS.API
+dotnet user-secrets set "Bootstrap:OrganizationName" "Your organization" --project UnifiedPOS.API
+dotnet user-secrets set "Bootstrap:Currency" "PKR" --project UnifiedPOS.API
+dotnet user-secrets set "Bootstrap:OwnerUserName" "aun@mailinator.com" --project UnifiedPOS.API
+```
+
+Set `Bootstrap__OwnerPassword` through your secure environment/secret manager, or use Visual Studio Manage User Secrets to add `Bootstrap:OwnerPassword`. Use a unique 12–128 character password. The requested password is eight characters; the suggested POS suffix produces eleven characters, so neither satisfies the existing policy. Do not commit credentials or reuse the SQL administrator password.
+
+On startup a serializable transaction and SQL application lock protect initial creation. Bootstrap creates the organization and a hashed Owner password only if absent. It never resets an existing password, promotes an existing non-Owner, or creates a second initial Owner. Configuration mismatches fail startup. No bootstrap endpoint or secret-bearing response is exposed.
+
+For production, apply migrations using a deployment identity, supply bootstrap values from a secret manager, and explicitly set `Bootstrap__AllowProduction=true` together with `Bootstrap__Enabled=true` for the controlled provisioning run. Disable bootstrap and remove its password afterward. Use a restricted SQL identity for the running API.
+
 POS backend in development, targeting .NET 10 and following the structure of `D:\Aun\igi-health-connect-portal`.
 
 ## Scope

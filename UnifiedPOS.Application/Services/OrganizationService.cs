@@ -47,7 +47,7 @@ namespace UnifiedPOS.Application.Services
         }
         public Task<ResponseMessage> SaveRegisterAsync(Guid locationId, Guid? id, RegisterRequest model, string key, CancellationToken ct) => MutateAsync("Register.Save", key, new { locationId, id, model }, async () =>
         {
-            RequireManager(); await LocationAsync(locationId, ct);
+            RequireAdmin(); await LocationAsync(locationId, ct);
             var register = id.HasValue ? await RegisterAsync(id.Value, ct) : new Register { LocationId = locationId };
             if (register.LocationId != locationId) throw PosException.Missing();
             if (!model.IsActive && await uow.RegisterRepository.AnyShiftsAsync(x => x.RegisterId == register.Id && x.ClosedOn == null, ct)) throw PosException.Conflict("Close the active shift before disabling a register.");

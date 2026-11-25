@@ -53,7 +53,7 @@ namespace UnifiedPOS.Application.Services
         }, ct);
         public Task<ResponseMessage> ResetPinAsync(Guid id, ResetPinRequest model, string key, CancellationToken ct) => MutateAsync("User.PinReset", key, new { id, model }, async () =>
         {
-            RequireManager();
+            RequireAdmin();
             var user = await uow.UserRepository.FindUserAsync(x => x.Id == id && x.OrganizationId == OrgId, ct) ?? throw PosException.Missing();
             if (request.Role == UserRole.Manager)
             {
