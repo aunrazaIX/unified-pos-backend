@@ -1,5 +1,15 @@
 # Unified POS backend
 
+## Unified password login and cashier registers
+
+`POST /api/v1/auth/login` accepts `userName` and `password` for Owner, Admin, Manager, and Cashier. Organization is resolved server-side from the globally unique normalized username. Apply the `UnifiedPasswordAndRegisterAssignments` migration before running this version. Existing duplicate normalized usernames must be resolved explicitly before that migration can succeed; it never merges accounts.
+
+Token responses include userId, organizationId, role, and optional registerId alongside access/refresh tokens. PIN login is retired (HTTP 410).
+
+Owner/Admin assign cashiers to locations, then replace register assignments using `PUT /api/v1/users/{id}/registers` with `{ "registerIds": [...] }` and an Idempotency-Key header. Assignments require active cashiers, registers, and organization locations. Duplicate pairs are prohibited by the join-table primary key; foreign keys reject missing users/registers.
+
+After password login, cashiers call `GET /api/v1/pos/available-registers`, then `POST /api/v1/pos/select-register` with `{ "registerId": "..." }`. Selection rejects unauthorized/inactive resources and conflicting open shifts. It revokes the old session and returns new tokens, which clients must replace together. Register operations require the selected register, an existing assignment, and the cashier's own shift. Bound sessions are checked against current assignments and active location/register state on every authenticated HTTP request.
+
 ## Initial Owner provisioning
 
 Owner is the super-admin persona within the current single organization. Owner and Admin may create/update locations and registers and manage users and assignments. Manager and Cashier cannot perform these mutations, including PIN resets. Owner location access is role-based and automatically includes future locations; assignment rows are not required.

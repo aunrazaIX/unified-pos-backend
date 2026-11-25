@@ -1076,8 +1076,10 @@ namespace UnifiedPOS.Infrastructure.Databases.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrganizationId", "NormalizedUserName")
+                    b.HasIndex("NormalizedUserName")
                         .IsUnique();
+
+                    b.HasIndex("OrganizationId");
 
                     b.ToTable("User");
                 });
@@ -1095,6 +1097,21 @@ namespace UnifiedPOS.Infrastructure.Databases.Migrations
                     b.HasIndex("LocationId");
 
                     b.ToTable("UserLocation");
+                });
+
+            modelBuilder.Entity("UnifiedPOS.Domain.Entities.UserRegister", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RegisterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("UserId", "RegisterId");
+
+                    b.HasIndex("RegisterId");
+
+                    b.ToTable("UserRegister");
                 });
 
             modelBuilder.Entity("UnifiedPOS.Domain.Entities.Cart", b =>
@@ -1362,6 +1379,21 @@ namespace UnifiedPOS.Infrastructure.Databases.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("UnifiedPOS.Domain.Entities.UserRegister", b =>
+                {
+                    b.HasOne("UnifiedPOS.Domain.Entities.Register", null)
+                        .WithMany()
+                        .HasForeignKey("RegisterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("UnifiedPOS.Domain.Entities.User", null)
+                        .WithMany("Registers")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("UnifiedPOS.Domain.Entities.Cart", b =>
                 {
                     b.Navigation("Lines");
@@ -1382,6 +1414,8 @@ namespace UnifiedPOS.Infrastructure.Databases.Migrations
             modelBuilder.Entity("UnifiedPOS.Domain.Entities.User", b =>
                 {
                     b.Navigation("Locations");
+
+                    b.Navigation("Registers");
                 });
 #pragma warning restore 612, 618
         }

@@ -10,5 +10,6 @@ namespace UnifiedPOS.Application.Interfaces.ServiceInterface
         Task<ResponseMessage> AddUserAsync(UserRequest model, string key, CancellationToken ct);
         Task<ResponseMessage> SetLocationsAsync(Guid id, LocationsRequest model, string key, CancellationToken ct);
         Task<ResponseMessage> ResetPinAsync(Guid id, ResetPinRequest model, string key, CancellationToken ct);
+        Task<ResponseMessage> SetRegistersAsync(Guid id, RegistersRequest model, string key, CancellationToken ct);
     }
 }

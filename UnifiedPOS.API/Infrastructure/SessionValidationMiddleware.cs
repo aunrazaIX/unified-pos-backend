@@ -22,6 +22,13 @@ public sealed class SessionValidationMiddleware(RequestDelegate next)
                 || session.RegisterId?.ToString() != context.User.FindFirst(JwtClaims.RegisterId)?.Value
                 || user.Role.ToString() != context.User.FindFirst(JwtClaims.Role)?.Value)
             { await RejectAsync(context); return; }
+            if (user.Role == UnifiedPOS.Domain.Enums.UserRole.Cashier && session.RegisterId.HasValue)
+            {
+                var register = await uow.OrganizationRepository.FindRegisterAsync(x => x.Id == session.RegisterId && x.IsActive, context.RequestAborted, false);
+                var location = register == null ? null : await uow.OrganizationRepository.FindLocationAsync(x => x.Id == register.LocationId && x.OrganizationId == organizationId && x.IsActive, context.RequestAborted, false);
+                if (register == null || location == null || !user.Registers.Any(x => x.RegisterId == register.Id) || !user.Locations.Any(x => x.LocationId == location.Id))
+                { await RejectAsync(context); return; }
+            }
         }
         await next(context);
     }

@@ -9,5 +9,7 @@ namespace UnifiedPOS.Application.Interfaces.ServiceInterface
         Task<ResponseMessage> PinAsync(PinRequest model, CancellationToken ct);
         Task<ResponseMessage> RefreshAsync(RefreshRequest model, CancellationToken ct);
         Task<ResponseMessage> LogoutAsync(CancellationToken ct);
+        Task<ResponseMessage> AvailableRegistersAsync(CancellationToken ct);
+        Task<ResponseMessage> SelectRegisterAsync(SelectRegisterRequest model, CancellationToken ct);
     }
 }

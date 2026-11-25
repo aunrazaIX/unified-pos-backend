@@ -11,7 +11,7 @@ namespace UnifiedPOS.API.Controllers;
 public sealed class AuthController(IAuthService service) : ControllerBase
 {
     [AllowAnonymous, EnableRateLimiting("authentication"), HttpPost("login")] public Task<ResponseMessage> Login(LoginRequest model, CancellationToken ct) => service.LoginAsync(model, ct);
-    [AllowAnonymous, EnableRateLimiting("authentication"), HttpPost("pin")] public Task<ResponseMessage> Pin(PinRequest model, CancellationToken ct) => service.PinAsync(model, ct);
+    [Obsolete("PIN login is retired. Use password login."), AllowAnonymous, EnableRateLimiting("authentication"), HttpPost("pin")] public Task<ResponseMessage> Pin(PinRequest model, CancellationToken ct) => service.PinAsync(model, ct);
     [AllowAnonymous, EnableRateLimiting("authentication"), HttpPost("refresh")] public Task<ResponseMessage> Refresh(RefreshRequest model, CancellationToken ct) => service.RefreshAsync(model, ct);
     [Authorize, HttpPost("logout")] public Task<ResponseMessage> Logout(CancellationToken ct) => service.LogoutAsync(ct);
 }

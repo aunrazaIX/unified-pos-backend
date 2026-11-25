@@ -25,6 +25,6 @@ public sealed class JwtService(IOptions<JwtSettings> settings) : IJwtService
         if (session.RegisterId.HasValue) claims.Add(new Claim(JwtClaims.RegisterId, session.RegisterId.Value.ToString()));
         var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.Value.Key)), SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(settings.Value.Issuer, settings.Value.Audience, claims, now, expires, credentials);
-        return new TokenResponse(new JwtSecurityTokenHandler().WriteToken(token), refreshToken, expires);
+        return new TokenResponse(new JwtSecurityTokenHandler().WriteToken(token), refreshToken, expires, user.Id, user.OrganizationId, user.Role, session.RegisterId);
     }
 }

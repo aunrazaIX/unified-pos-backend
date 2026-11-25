@@ -11,7 +11,7 @@ namespace UnifiedPOS.Infrastructure.Repositories
     {
         private IQueryable<User> UsersQuery(bool tracked)
         {
-            IQueryable<User> query = context.Set<User>().Include(x => x.Locations);
+            IQueryable<User> query = context.Set<User>().Include(x => x.Locations).Include(x => x.Registers).AsSplitQuery();
             return tracked ? query : query.AsNoTracking();
         }
 

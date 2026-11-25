@@ -24,7 +24,7 @@ namespace UnifiedPOS.Application.Services
             var ids = model.LocationIds.Distinct().ToArray();
             await ValidateLocationsAsync(ids, ct);
             var user = new User { OrganizationId = OrgId, UserName = model.UserName.Trim(), NormalizedUserName = model.UserName.Trim().ToUpperInvariant(), Role = model.Role };
-            if (await uow.UserRepository.AnyUsersAsync(x => x.OrganizationId == OrgId && x.NormalizedUserName == user.NormalizedUserName, ct)) throw PosException.Conflict("User name already exists.");
+            if (await uow.UserRepository.AnyUsersAsync(x => x.NormalizedUserName == user.NormalizedUserName, ct)) throw PosException.Conflict("User name already exists.");
             user.PasswordHash = hasher.HashPassword(user, model.Password);
             user.Locations = ids.Select(id => new UserLocation { UserId = user.Id, LocationId = id }).ToList();
             uow.UserRepository.AddUser(user);
@@ -36,6 +36,23 @@ namespace UnifiedPOS.Application.Services
             var locations = await uow.OrganizationRepository.ListLocationsAsync(x => x.OrganizationId == OrgId && ids.Contains(x.Id), ct);
             if (locations.Count != ids.Length) throw PosException.Invalid("One or more locations are unavailable.");
         }
+        public Task<ResponseMessage> SetRegistersAsync(Guid id, RegistersRequest model, string key, CancellationToken ct) => MutateAsync("User.Registers", key, new { id, model }, async () =>
+        {
+            RequireAdmin();
+            var user = await uow.UserRepository.FindUserAsync(x => x.Id == id && x.OrganizationId == OrgId && x.IsActive, ct) ?? throw PosException.Missing();
+            if (user.Role != UserRole.Cashier) throw PosException.Invalid("Only cashiers receive register assignments.");
+            var ids = model.RegisterIds.Distinct().ToArray();
+            if (ids.Length != model.RegisterIds.Length) throw PosException.Invalid("Duplicate register assignments are invalid.");
+            var locations = user.Locations.Select(x => x.LocationId).ToArray();
+            var activeLocations = await uow.OrganizationRepository.ListLocationsAsync(x => x.OrganizationId == OrgId && x.IsActive && locations.Contains(x.Id), ct);
+            var locationIds = activeLocations.Select(x => x.Id).ToArray();
+            var registers = await uow.OrganizationRepository.ListRegistersAsync(x => ids.Contains(x.Id) && x.IsActive && locationIds.Contains(x.LocationId), ct);
+            if (registers.Count != ids.Length) throw PosException.Invalid("Registers must be active and belong to assigned active organization locations.");
+            foreach (var removed in user.Registers.Where(x => !ids.Contains(x.RegisterId)).ToArray()) user.Registers.Remove(removed);
+            foreach (var registerId in ids.Where(x => !user.Registers.Any(r => r.RegisterId == x))) user.Registers.Add(new UserRegister { UserId = id, RegisterId = registerId });
+            Audit("User.RegistersChanged", id);
+            return new { UserId = id, RegisterIds = ids };
+        }, ct);
         public Task<ResponseMessage> SetLocationsAsync(Guid id, LocationsRequest model, string key, CancellationToken ct) => MutateAsync("User.Locations", key, new { id, model }, async () =>
         {
             RequireAdmin();

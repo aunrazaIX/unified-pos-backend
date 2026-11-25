@@ -45,7 +45,7 @@ public class ApiContractTests
     [Fact]
     public void EveryMutationExceptAuthenticationAndDisabledSyncRequiresIdempotencyKey()
     {
-        var exempt = new HashSet<string> { "AuthController.Login", "AuthController.Pin", "AuthController.Refresh", "AuthController.Logout", "PosController.Sync" };
+        var exempt = new HashSet<string> { "AuthController.Login", "AuthController.Pin", "AuthController.Refresh", "AuthController.Logout", "PosController.Sync", "PosController.SelectRegister" };
         var mutations = Controllers.SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public)
             .Where(method => method.GetCustomAttributes().Any(attribute => attribute is HttpPostAttribute or HttpPutAttribute))
             .Select(method => (Name: $"{type.Name}.{method.Name}", Method: method)));

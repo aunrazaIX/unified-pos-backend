@@ -14,5 +14,6 @@ namespace UnifiedPOS.Domain.Entities
         public int FailedAttempts { get; set; }
         public DateTime? LockedUntil { get; set; }
         public ICollection<UserLocation> Locations { get; set; } = [];
+        public ICollection<UserRegister> Registers { get; set; } = [];
     }
 }

@@ -28,6 +28,12 @@ namespace UnifiedPOS.Application.Services
         {
             var register = await uow.OrganizationRepository.FindRegisterAsync(x => x.Id == id, ct) ?? throw PosException.Missing();
             await LocationAsync(register.LocationId, ct);
+            if (request.Role == UserRole.Cashier)
+            {
+                var user = await uow.UserRepository.FindUserAsync(x => x.Id == ActorId && x.OrganizationId == OrgId && x.IsActive, ct) ?? throw PosException.Forbidden();
+                if (request.RegisterId != id || !user.Registers.Any(x => x.RegisterId == id) || !register.IsActive)
+                    throw PosException.Forbidden();
+            }
             if (request.RegisterId.HasValue && request.RegisterId != id) throw PosException.Forbidden();
             return register;
         }

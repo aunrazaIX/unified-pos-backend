@@ -31,7 +31,10 @@ namespace UnifiedPOS.Infrastructure.Databases
             modelBuilder.Entity<Register>().HasOne<Location>().WithMany().HasForeignKey(x => x.LocationId);
             modelBuilder.Entity<Register>().HasIndex(x => new { x.LocationId, x.Name }).IsUnique();
             modelBuilder.Entity<User>().HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId);
-            modelBuilder.Entity<User>().HasIndex(x => new { x.OrganizationId, x.NormalizedUserName }).IsUnique();
+            modelBuilder.Entity<User>().HasIndex(x => x.NormalizedUserName).IsUnique();
+            modelBuilder.Entity<UserRegister>().HasKey(x => new { x.UserId, x.RegisterId });
+            modelBuilder.Entity<User>().HasMany(x => x.Registers).WithOne().HasForeignKey(x => x.UserId);
+            modelBuilder.Entity<UserRegister>().HasOne<Register>().WithMany().HasForeignKey(x => x.RegisterId);
             modelBuilder.Entity<User>().HasMany(x => x.Locations).WithOne().HasForeignKey(x => x.UserId);
             modelBuilder.Entity<UserLocation>().HasKey(x => new { x.UserId, x.LocationId });
             modelBuilder.Entity<UserLocation>().HasOne<Location>().WithMany().HasForeignKey(x => x.LocationId);
@@ -92,6 +95,7 @@ namespace UnifiedPOS.Infrastructure.Databases
                 fk.DeleteBehavior = DeleteBehavior.Restrict;
             modelBuilder.Entity<Cart>().HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.CartId).OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<User>().HasMany(x => x.Locations).WithOne().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<User>().HasMany(x => x.Registers).WithOne().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         }
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
